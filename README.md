@@ -23,7 +23,7 @@ A web-based tool for converting Calypso CMM (Coordinate Measuring Machine) PDF r
 ```bash
 # If using git
 git clone <repository-url>
-cd calypso-pdf-converter
+cd PDF_to_CSV
 
 # Or download and extract the ZIP file
 ```
@@ -32,14 +32,14 @@ cd calypso-pdf-converter
 
 ```bash
 # Create virtual environment
-python -m venv calypso-env
+python -m venv venv
 
 # Activate virtual environment
 # On Windows:
-calypso-env\Scripts\activate
+venv\Scripts\activate
 
 # On macOS/Linux:
-source calypso-env/bin/activate
+source venv/bin/activate
 ```
 
 ### 3. Install Required Packages
@@ -61,7 +61,7 @@ pip install Werkzeug==2.3.7
 
 Check that all required files are present:
 ```
-calypso-pdf-converter/
+PDF_to_CSV/
 ├── app.py              # Main Flask application
 ├── index.html          # Web interface
 ├── requirements.txt    # Python dependencies
