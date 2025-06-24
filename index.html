@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calypso PDF to CSV Converter</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .version {
+            color: #999;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .upload-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .upload-zone {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 50px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: rgba(102, 126, 234, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-zone::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+            transform: rotate(45deg);
+            transition: all 0.5s ease;
+            opacity: 0;
+        }
+
+        .upload-zone:hover::before {
+            opacity: 1;
+            animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+
+        .upload-zone:hover {
+            border-color: #5a6fd8;
+            background: rgba(102, 126, 234, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+        }
+
+        .upload-zone.dragover {
+            border-color: #27ae60;
+            background: rgba(39, 174, 96, 0.1);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: relative;
+            z-index: 2;
+        }
+
+        .upload-icon::before {
+            content: 'PDF';
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .upload-text {
+            font-size: 20px;
+            color: #555;
+            margin-bottom: 15px;
+            font-weight: 600;
+            position: relative;
+            z-index: 2;
+        }
+
+        .upload-subtext {
+            color: #888;
+            font-size: 16px;
+            position: relative;
+            z-index: 2;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 8px 25px rgba(39, 174, 96, 0.4);
+        }
+
+        .preview-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .preview-info h3 {
+            color: #2c3e50;
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .preview-info p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .options {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(102, 126, 234, 0.1);
+            padding: 10px 15px;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+
+        .checkbox-container:hover {
+            background: rgba(102, 126, 234, 0.15);
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #667eea;
+        }
+
+        .checkbox-container label {
+            font-weight: 500;
+            color: #555;
+            cursor: pointer;
+        }
+
+        .preview-table {
+            overflow-x: auto;
+            margin-bottom: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 15px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 60px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .spinner {
+            border: 4px solid rgba(102, 126, 234, 0.1);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading p {
+            color: #666;
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .message {
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .error {
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+        }
+
+        .success {
+            background: rgba(39, 174, 96, 0.9);
+            color: white;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+        }
+
+        .file-list {
+            margin-top: 30px;
+            padding: 25px;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 15px;
+            border: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .file-list h4 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .file-item:hover {
+            padding-left: 10px;
+            background: rgba(102, 126, 234, 0.05);
+            border-radius: 8px;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-info {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .file-size {
+            color: #888;
+            font-size: 13px;
+        }
+
+        .file-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header, .upload-section, .preview-section {
+                padding: 25px;
+                border-radius: 15px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .upload-zone {
+                padding: 30px 20px;
+            }
+            
+            .upload-icon {
+                font-size: 48px;
+            }
+            
+            .upload-text {
+                font-size: 18px;
+            }
+            
+            .preview-header {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: center;
+            }
+            
+            .options {
+                justify-content: center;
+            }
+            
+            table {
+                font-size: 12px;
+            }
+            
+            th, td {
+                padding: 10px 8px;
+            }
+            
+            .file-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .upload-text {
+                font-size: 16px;
+            }
+            
+            .btn {
+                padding: 12px 24px;
+                font-size: 14px;
+            }
+        }
+
+        /* Loading animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Smooth transitions */
+        .preview-section, .loading, .file-list {
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header fade-in">
+            <h1>Calypso PDF to CSV Converter</h1>
+            <p>Transform your Calypso CMM measurement reports into CSV format.</p>
+            <p>Extract dimensional measurements with ease.</p>
+            <div class="version">Version 1.0.2 | Built for precision manufacturing</div>
+        </div>
+
+        <div class="upload-section fade-in">
+            <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon"></div>
+                <div class="upload-text">Drop your Calypso PDF reports here</div>
+                <div class="upload-subtext">or click to browse files • Supports multiple PDFs</div>
+                <input type="file" id="fileInput" multiple accept=".pdf">
+            </div>
+            
+            <div id="fileList" class="file-list" style="display: none;">
+                <h4>Selected Files</h4>
+                <div id="fileItems"></div>
+                <button id="uploadBtn" class="btn" style="margin-top: 20px;">
+                    Process Files
+                </button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing PDF files and extracting measurements...</p>
+        </div>
+
+        <div id="messages"></div>
+
+        <div class="preview-section" id="previewSection">
+            <div class="preview-header">
+                <div class="preview-info">
+                    <h3>Data Preview</h3>
+                    <p id="previewInfo"></p>
+                </div>
+                <div class="options">
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="includeStats">
+                        <label for="includeStats">Include statistical summary</label>
+                    </div>
+                    <button id="downloadBtn" class="btn btn-success">
+                        Download CSV
+                    </button>
+                </div>
+            </div>
+            
+            <div class="preview-table">
+                <table id="previewTable">
+                    <thead id="tableHead"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let uploadedData = [];
+        
+        // Get DOM elements
+        const uploadZone = document.querySelector('.upload-zone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const fileItems = document.getElementById('fileItems');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const loading = document.getElementById('loading');
+        const messages = document.getElementById('messages');
+        const previewSection = document.getElementById('previewSection');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // Enhanced drag and drop with better visual feedback
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            if (!uploadZone.contains(e.relatedTarget)) {
+                uploadZone.classList.remove('dragover');
+            }
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files).filter(file => 
+                file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+            );
+            
+            if (files.length === 0) {
+                showError('Please select PDF files only.');
+                return;
+            }
+            
+            handleFiles(files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleFiles(files);
+        });
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+
+            // Clear previous selections
+            fileItems.innerHTML = '';
+            
+            files.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <div class="file-info">
+                        <div class="file-name">[PDF] ${file.name}</div>
+                        <div class="file-size">${formatFileSize(file.size)} • ${new Date(file.lastModified).toLocaleDateString()}</div>
+                    </div>
+                    <div class="file-status">Ready</div>
+                `;
+                fileItems.appendChild(fileItem);
+            });
+
+            fileList.style.display = 'block';
+            fileList.classList.add('fade-in');
+            uploadBtn.onclick = () => uploadFiles(files);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function uploadFiles(files) {
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('files', file);
+            });
+
+            // Show loading state
+            loading.style.display = 'block';
+            loading.classList.add('fade-in');
+            messages.innerHTML = '';
+            previewSection.style.display = 'none';
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Processing...';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                loading.style.display = 'none';
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Process Files';
+                
+                if (data.success) {
+                    showSuccess(`
+                        [SUCCESS] Successfully processed ${data.processed_files.length} file(s)<br>
+                        [DATA] Extracted ${data.total_measurements} measurements<br>
+                        [FILES] ${data.processed_files.join(', ')}
+                    `);
+                    showPreview(data);
+                    uploadedData = data.preview;
+                    
+                    if (data.errors && data.errors.length > 0) {
+                        showError('[WARNING] Some files had issues:<br>' + data.errors.join('<br>'));
+                    }
+                } else {
+                    showError('[ERROR] ' + data.error + (data.details ? '<br>Details: ' + data.details.join('<br>') : ''));
+                }
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Process Files';
+                showError('[ERROR] Error uploading files: ' + error.message);
+                console.error('Upload error:', error);
+            });
+        }
+
+        function showPreview(data) {
+            const previewInfo = document.getElementById('previewInfo');
+            previewInfo.innerHTML = `
+                Showing <strong>${Math.min(10, data.total_parts)}</strong> of <strong>${data.total_parts}</strong> parts 
+                with <strong>${data.total_measurements}</strong> total measurements from <strong>${data.processed_files.length}</strong> file(s)
+            `;
+            
+            // Create table headers
+            const tableHead = document.getElementById('tableHead');
+            const headerRow = document.createElement('tr');
+            data.columns.forEach(column => {
+                const th = document.createElement('th');
+                th.textContent = formatColumnName(column);
+                headerRow.appendChild(th);
+            });
+            tableHead.innerHTML = '';
+            tableHead.appendChild(headerRow);
+
+            // Create table body
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+            data.preview.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                data.columns.forEach(column => {
+                    const td = document.createElement('td');
+                    const value = row[column];
+                    
+                    // Format values based on column type
+                    if (typeof value === 'number') {
+                        td.textContent = parseFloat(value.toFixed(6));
+                    } else {
+                        td.textContent = value || '';
+                    }
+                    
+                    tr.appendChild(td);
+                });
+                tableBody.appendChild(tr);
+            });
+
+            previewSection.style.display = 'block';
+            previewSection.classList.add('fade-in');
+        }
+
+        function formatColumnName(column) {
+            return column
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        downloadBtn.addEventListener('click', () => {
+            const includeStats = document.getElementById('includeStats').checked;
+            
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = 'Generating...';
+            
+            fetch('/download_csv', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    data: uploadedData,
+                    include_stats: includeStats
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Download failed');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `calypso_measurements_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Download CSV';
+                showSuccess('[SUCCESS] CSV file downloaded successfully!');
+            })
+            .catch(error => {
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Download CSV';
+                showError('[ERROR] Error downloading file: ' + error.message);
+                console.error('Download error:', error);
+            });
+        });
+
+        function showError(message) {
+            messages.innerHTML = `<div class="message error fade-in">${message}</div>`;
+            setTimeout(() => {
+                const errorMsg = messages.querySelector('.error');
+                if (errorMsg) errorMsg.style.opacity = '0.7';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            messages.innerHTML = `<div class="message success fade-in">${message}</div>`;
+            setTimeout(() => {
+                const successMsg = messages.querySelector('.success');
+                if (successMsg) successMsg.style.opacity = '0.7';
+            }, 10000);
+        }
+
+        // Add some interactive feedback
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add smooth scroll behavior
+            document.documentElement.style.scrollBehavior = 'smooth';
+            
+            // Add loading states to buttons
+            const buttons = document.querySelectorAll('.btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (!this.disabled) {
+                        this.style.transform = 'scale(0.98)';
+                        setTimeout(() => {
+                            this.style.transform = '';
+                        }, 150);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
