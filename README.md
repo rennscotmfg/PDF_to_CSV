@@ -1,6 +1,8 @@
-# Calypso PDF to CSV Converter - Installation Guide
+# Calypso PDF to CSV/JSON Converter - Installation Guide
 
-A web-based tool for converting Calypso CMM (Coordinate Measuring Machine) PDF reports into structured CSV format for data analysis.
+A web-based tool for converting Calypso CMM (Coordinate Measuring Machine) PDF reports into structured CSV or JSON format for data analysis.
+
+⚠️ Notice: This code is provided for review and reference only. It is not open source and may not be used, copied, or modified without explicit permission.
 
 ## Features
 
@@ -55,18 +57,6 @@ pip install Flask==2.3.3
 pip install pdfplumber==0.9.0
 pip install pandas==2.0.3
 pip install Werkzeug==2.3.7
-```
-
-### 4. Verify Installation
-
-Check that all required files are present:
-```
-PDF_to_CSV/
-├── app.py              # Main Flask application
-├── index.html          # Web interface
-├── requirements.txt    # Python dependencies
-├── uploads/           # Created automatically for temp files
-└── README.md          # This file
 ```
 
 ## Running the Application
@@ -182,6 +172,6 @@ If you encounter issues:
 
 ---
 
-**Version**: 1.0.2  
+**Version**: 2.0 
 **Tested with**: Python 3.8+, Flask 2.3.3  
 **Supported PDFs**: Calypso CMM measurement reports
