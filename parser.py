@@ -1,53 +1,121 @@
 import pdfplumber
 import pandas as pd
 import re
+from typing import List, Dict, Any
+import os
 
-def extract_calypso_data(pdf_path):
-    measurements = []
+def extract_text_from_pdf(pdf_path: str) -> str:
     try:
         with pdfplumber.open(pdf_path) as pdf:
+            text = ''
             for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    measurements.extend(process_text_data(text))
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + '\n'
+        return text
     except Exception as e:
-        print(f"Error processing PDF: {str(e)}")
-    return measurements
+        print(f"Error processing {pdf_path}: {e}")
+        return ""
 
-def process_text_data(text):
+def extract_dim_lines(text: str) -> List[List[str]]:
+    unstructured_lines = text.split('\n')
+    lines = []
+    for line in unstructured_lines:
+        word_list = line.split()
+        if len(word_list) > 1:
+            for i, word in enumerate(word_list):
+                if word.startswith('DIM#'):
+                    lines.append(word_list[i:])
+    return lines
+
+def create_dim_list(lines: List[List[str]]) -> List[Dict[str, Any]]:
+    dim_list = []
+    for line in lines:
+        if line and len(line) > 1:
+            dim_name = line[0].split('#')[1]
+            try:
+                unit = re.split(r'[\d\.\d]+', line[1])[1]
+                if unit == '':
+                    unit = line[2]
+            except Exception:
+                unit = 'None'
+            if not any(entry['tag'] == dim_name for entry in dim_list):
+                dim_list.append({'tag': dim_name, 'values': [], 'unit': unit})
+    for line in lines:
+        if len(line) > 1:
+            dim_name = line[0].split('#')[1]
+            match = re.match(r'[\d.]+', line[1])
+            if match:
+                value = match.group(0)
+                for entry in dim_list:
+                    if entry['tag'] == dim_name:
+                        entry['values'].append(value)
+    return dim_list
+
+def normalize_tag(tag: str) -> str:
+    match = re.match(r"(\d+)", tag)
+    return match.group(1) if match else None
+
+def get_priority(tag: str) -> int:
+    tag_upper = tag.upper()
+    if "(M)" in tag_upper:
+        return 1
+    elif re.fullmatch(r"\d+", tag):
+        return 2
+    elif "MIN" in tag_upper:
+        return 3
+    else:
+        return 4
+
+def prioritize_tags(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    prioritized = {}
+    for entry in data:
+        base = normalize_tag(entry["tag"])
+        if not base:
+            continue
+        priority = get_priority(entry["tag"])
+        if base not in prioritized:
+            prioritized[base] = (priority, entry)
+        else:
+            existing_priority, _ = prioritized[base]
+            if priority < existing_priority:
+                prioritized[base] = (priority, entry)
+    result = []
+    for base, (_, entry) in sorted(prioritized.items(), key=lambda x: int(x[0])):
+        result.append({
+            "tag": base,
+            "values": entry["values"],
+            "unit": entry["unit"]
+        })
+    return result
+
+# ✅ This replaces the old extract_calypso_data()
+def extract_calypso_data(pdf_path: str) -> List[Dict[str, Any]]:
+    text = extract_text_from_pdf(pdf_path)
+    if not text.strip():
+        return []
+    lines = extract_dim_lines(text)
+    dim_list = create_dim_list(lines)
+    filtered = prioritize_tags(dim_list)
+
     measurements = []
-    lines = text.split('\n')
-    dim_lines = [line.strip() for line in lines if line.strip() and 'DIM' in line and ('mm' in line or 'inches' in line)]
-
-    for line in dim_lines:
-        cleaned_line = line
-        for suffix in ['_X', '_Y', '_Z']:
-            cleaned_line = cleaned_line.replace(suffix, '')
-        unit = 'mm' if 'mm' in cleaned_line else 'inches' if 'inches' in cleaned_line else None
-        if not unit:
-            continue
-        cleaned_line = cleaned_line[:cleaned_line.find(unit) + len(unit)].replace(' ', '')
-        try:
-            unit_pos = cleaned_line.find(unit)
-            before_unit = cleaned_line[:unit_pos]
-            last_dash = before_unit.rfind('-')
-            if last_dash == -1:
+    for entry in filtered:
+        for value in entry['values']:
+            try:
+                measurements.append({
+                    'Name': f'DIM#{entry["tag"]}',
+                    'Measured_Value': float(value),
+                    'Unit': entry['unit'], 
+                    'Nominal_Value': None,
+                    'Plus_Tolerance': None,
+                    'Minus_Tolerance': None,
+                    'Deviation': None
+                })
+            except ValueError:
                 continue
-            dim_name = before_unit[:last_dash + 1]
-            measured_value = float(before_unit[last_dash + 1:])
-            measurements.append({
-                'Name': dim_name,
-                'Measured_Value': measured_value,
-                'Unit': unit,
-                'Nominal_Value': None,
-                'Plus_Tolerance': None,
-                'Minus_Tolerance': None,
-                'Deviation': None
-            })
-        except:
-            continue
     return measurements
 
+# Sorting & DataFrame building logic unchanged
 def sort_dim_columns(dim_names):
     def extract_dim_number(name):
         name = name.replace('DIM', '').replace('#', '')
