@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calypso PDF to CSV/JSON</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/index.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header fade-in">
+            <h1>Calypso PDF to CSV/JSON Converter</h1>
+            <p>Transform your Calypso CMM measurement reports into CSV or JSON format.</p>
+            <p>Extract dimensional measurements with ease.</p>
+            <div class="version">Version 2.0 | Built for precision manufacturing</div>
+        </div>
+
+        <div class="upload-section fade-in">
+            <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon"></div>
+                <div class="upload-text">Drop your Calypso PDF reports here</div>
+                <div class="upload-subtext">or click to browse files • Supports multiple PDFs</div>
+                <input type="file" id="fileInput" multiple accept=".pdf">
+            </div>
+            
+            <div id="fileList" class="file-list" style="display: none;">
+                <h4>Selected Files</h4>
+                <div id="fileItems"></div>
+                <button id="uploadBtn" class="btn" style="margin-top: 20px;">
+                    Process Files
+                </button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing PDF files and extracting measurements...</p>
+        </div>
+
+        <div id="messages"></div>
+
+        <div class="preview-section" id="previewSection">
+            <div class="preview-header">
+                <div class="preview-info">
+                    <h3>Data Preview</h3>
+                    <p id="previewInfo"></p>
+                </div>
+                <div class="options">
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="includeStats">
+                        <label for="includeStats">Include statistical summary</label>
+                    </div>
+                    <button id="copyBtn" class="btn btn-warning">
+                        Copy JSON to Clipboard
+                    </button>
+                    <button id="downloadBtn" class="btn btn-success">
+                        Download CSV
+                    </button>
+                </div>
+            </div>
+            
+            <div class="preview-table">
+                <table id="previewTable">
+                    <thead id="tableHead"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+</body>
+</html>

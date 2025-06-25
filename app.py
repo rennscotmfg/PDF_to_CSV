@@ -1,7 +1,8 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template
 import os
 from parser import extract_calypso_data, create_wide_format_table
 from csv_exporter import generate_transposed_csv
+from json_exporter import export_json
 from io import BytesIO
 import pandas as pd
 
@@ -12,27 +13,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['CURRENT_DATA'] = None
-REVISION = "1.0.2"
 
 @app.route('/')
 def index():
-    try:
-        with open('index.html', 'r', encoding='utf-8') as f:
-            return f.read()
-    except UnicodeDecodeError:
-        with open('index.html', 'r', encoding='utf-8', errors='ignore') as f:
-            return f.read()
-    except FileNotFoundError:
-        return '''
-        <!DOCTYPE html>
-        <html>
-        <head><title>Calypso PDF Converter</title></head>
-        <body>
-        <h1>Calypso PDF to CSV Converter</h1>
-        <p>Please ensure index.html is in the same directory as app.py</p>
-        </body>
-        </html>
-        '''
+    return render_template('index.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
@@ -63,6 +47,7 @@ def upload_files():
                         m['Part_Number'] = 'Unknown'
                     all_measurements.extend(measurements)
                     processed_files.append(file.filename)
+                    total_measurements = len(measurements)
                 else:
                     errors.append(f"{file.filename}: No measurement data found")
 
@@ -77,12 +62,12 @@ def upload_files():
 
         df = create_wide_format_table(all_measurements)
         app.config['CURRENT_DATA'] = df
-        print(df)
+        app.config['JSON_DATA'] = export_json(df)
         preview_data = df.head(10).to_dict('records') if not df.empty else []
 
         return jsonify({
             'success': True,
-            'total_measurements': len(all_measurements),
+            'total_measurements': total_measurements,
             'total_parts': len(df) if not df.empty else 0,
             'processed_files': processed_files,
             'errors': errors if errors else None,
@@ -111,6 +96,13 @@ def download_csv():
         )
     except Exception as e:
         return jsonify({'error': f'Error generating CSV: {str(e)}'}), 500
+
+@app.route('/json_data', methods=['GET'])
+def get_json_data():
+    json_data = app.config.get('JSON_DATA')
+    if json_data is None:
+        return jsonify({'error': 'No JSON data available'}), 400
+    return json_data
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
