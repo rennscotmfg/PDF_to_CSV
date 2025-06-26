@@ -27,7 +27,6 @@ def upload_files():
 
         all_measurements = []
         file_paths = []
-        file_names = []
         errors = []
 
         for file in files:
@@ -40,13 +39,12 @@ def upload_files():
             try:
                 temp_path = os.path.join(UPLOAD_FOLDER, file.filename)
                 file_paths.append(temp_path)
-                file_names.append(file.filename)
                 file.save(temp_path)
             except Exception as e:
                 errors.append(f"{file.filename}: {str(e)}")
         
         try:
-            df = get_dataframe(file_paths, file_names)
+            df = get_dataframe(file_paths)
         except Exception as e:
             return jsonify({'success': False, 'error': f'Error processing files: {str(e)}'})
         
@@ -58,16 +56,25 @@ def upload_files():
 
         app.config['CURRENT_DATA'] = df
         app.config['JSON_DATA'] = export_json(df)
-        preview_data = df.head(10).to_dict('records') if not df.empty else []
+        preview_data = df.to_dict('records') if not df.empty else []
+
+        # Count files with OOT values
+        OOT_files_count = 0
+        OOT_files_list = []
+        if not df.empty and 'Has_OOT_Values' in df.columns:
+            OOT_files_count = int(df['Has_OOT_Values'].sum())
+            OOT_files_list = df[df['Has_OOT_Values'] == True]['Source_File'].tolist()
 
         return jsonify({
             'success': True,
             'total_measurements': sum('DIM' in col for col in df.columns),
             'total_parts': len(df) if not df.empty else 0,
-            'processed_files': file_names,
+            'processed_files': [os.path.basename(fp) for fp in file_paths],
             'errors': errors if errors else None,
             'columns': df.columns.tolist() if not df.empty else [],
-            'preview': preview_data
+            'preview': preview_data,
+            'OOT_files_count': OOT_files_count,
+            'OOT_files_list': OOT_files_list
         })
     except Exception as e:
         return jsonify({'success': False, 'error': f'Server error: {str(e)}'})

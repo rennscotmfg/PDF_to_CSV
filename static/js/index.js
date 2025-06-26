@@ -107,11 +107,20 @@ function uploadFiles(files) {
         uploadBtn.textContent = 'Process Files';
         
         if (data.success) {
-            showSuccess(`
+            let successMessage = `
                 [SUCCESS] Successfully processed ${data.processed_files.length} file(s)<br>
                 [DATA] Extracted ${data.total_measurements} measurements<br>
                 [FILES] ${data.processed_files.join(', ')}
-            `);
+            `;
+            
+            // Add OOT values information to success message
+            if (data.OOT_files_count > 0) {
+                successMessage += `<br>[WARNING] ${data.OOT_files_count} file(s) contain OOT values (out of tolerance): ${data.OOT_files_list.join(', ')}`;
+            } else {
+                successMessage += `<br>[INFO] No OOT values detected in any files`;
+            }
+            
+            showSuccess(successMessage);
             showPreview(data);
             uploadedData = data.preview;
             
@@ -133,10 +142,17 @@ function uploadFiles(files) {
 
 function showPreview(data) {
     const previewInfo = document.getElementById('previewInfo');
-    previewInfo.innerHTML = `
-        Showing <strong>${Math.min(10, data.total_parts)}</strong> of <strong>${data.total_parts}</strong> parts 
+    let infoText = `
+        Showing <strong>${data.total_parts}</strong> parts 
         with <strong>${data.total_measurements}</strong> total measurements from <strong>${data.processed_files.length}</strong> file(s)
     `;
+    
+    // Add OOT values summary to preview info
+    if (data.OOT_files_count > 0) {
+        infoText += `<br><span style="color: #dc3545; font-weight: bold;">⚠️ ${data.OOT_files_count} file(s) have OOT values (highlighted in red)</span>`;
+    }
+    
+    previewInfo.innerHTML = infoText;
     
     // Create table headers
     const tableHead = document.getElementById('tableHead');
@@ -154,15 +170,33 @@ function showPreview(data) {
     tableBody.innerHTML = '';
     data.preview.forEach((row, index) => {
         const tr = document.createElement('tr');
+        
+        // Check if this row has OOT values and apply styling
+        const hasOOTValues = row.Has_OOT_Values === true;
+        if (hasOOTValues) {
+            tr.classList.add('OOT-row');
+            tr.style.backgroundColor = '#ffebee';
+            tr.style.borderLeft = '4px solid #f44336';
+        }
+        
         data.columns.forEach(column => {
             const td = document.createElement('td');
             const value = row[column];
             
-            // Format values based on column type
-            if (typeof value === 'number') {
-                td.textContent = parseFloat(value.toFixed(6));
+            // Special handling for Has_OOT_Values column
+            if (column === 'Has_OOT_Values') {
+                if (value === true) {
+                    td.innerHTML = '<span style="color: #f44336; font-weight: bold;">⚠️ YES</span>';
+                } else {
+                    td.innerHTML = '<span style="color: #4caf50;">✓ NO</span>';
+                }
             } else {
-                td.textContent = value || '';
+                // Format values based on column type
+                if (typeof value === 'number') {
+                    td.textContent = parseFloat(value.toFixed(6));
+                } else {
+                    td.textContent = value || '';
+                }
             }
             
             tr.appendChild(td);
@@ -290,4 +324,20 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+    
+    // Add CSS for OOT rows if not already present
+    if (!document.getElementById('OOT-row-styles')) {
+        const style = document.createElement('style');
+        style.id = 'OOT-row-styles';
+        style.textContent = `
+            .OOT-row {
+                background-color: #ffebee !important;
+                border-left: 4px solid #f44336 !important;
+            }
+            .OOT-row:hover {
+                background-color: #ffcdd2 !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
 });

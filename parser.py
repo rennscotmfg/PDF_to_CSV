@@ -1,12 +1,12 @@
 import pdfplumber
 import pandas as pd
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import os
 import time
 
 def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extract text from a single PDF file."""
+    """Extract text from a single PDF file and detect if red values are present."""
     try:
         with pdfplumber.open(pdf_path) as pdf:
             text = ''
@@ -17,9 +17,9 @@ def extract_text_from_pdf(pdf_path: str) -> str:
         return text
     except Exception as e:
         print(f"Error processing {pdf_path}: {e}")
-        return ""
+        return "", False
 
-def extract_dim_lines(text: str) -> List[List[str]]:
+def extract_dim_lines(text: str) -> Tuple[List[List[str]], bool]:
     """Extract lines containing DIM# tags from text."""
     unstructured_lines = text.split('\n')
     lines = []
@@ -30,8 +30,13 @@ def extract_dim_lines(text: str) -> List[List[str]]:
             for i, word in enumerate(word_list):
                 if word.startswith('DIM#'):
                     lines.append(word_list[i:])
+                if word == 'Numbervalues:red' or word == 'red':
+                    if int(word_list[i+1]) > 0:
+                        red_flag = True
+                    else:
+                        red_flag = False
     
-    return lines
+    return lines, red_flag
 
 def create_dim_list(lines: List[List[str]]) -> List[Dict[str, Any]]:
     """Create initial dimension list from extracted lines."""
@@ -39,7 +44,7 @@ def create_dim_list(lines: List[List[str]]) -> List[Dict[str, Any]]:
     
     # Create entries for each unique DIM tag
     for line in lines:
-        if len(line) > 1:  # Check if line is not empty
+        if line:  # Check if line is not empty
             dim_name = line[0].split('#')[1]
             try:
                 unit = re.split(r'[\d\.\d]+', line[1])[1]
@@ -54,7 +59,7 @@ def create_dim_list(lines: List[List[str]]) -> List[Dict[str, Any]]:
     
     # Populate values for each tag
     for line in lines:
-        if len(line) > 1:  # Ensure there's a value after the tag
+        if line:  # Ensure there's a value after the tag
             dim_name = line[0].split('#')[1]
             value = re.match(r'[\d\.\d]+', line[1]).group(0)
             for entry in dim_list:
@@ -110,26 +115,26 @@ def prioritize_tags(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     
     return result
 
-def process_single_pdf(pdf_path: str) -> List[Dict[str, Any]]:
-    """Process a single PDF and return filtered dimension data."""
+def process_single_pdf(pdf_path: str) -> Tuple[List[Dict[str, Any]], bool]:
+    """Process a single PDF and return filtered dimension data and red flag."""
     print(f"Processing: {pdf_path}")
     
     # Check if file exists
     if not os.path.exists(pdf_path):
         print(f"Warning: File {pdf_path} not found")
-        return []
+        return [], False
     
-    # Extract text
+    # Extract text and red flag
     text = extract_text_from_pdf(pdf_path)
     if not text.strip():
         print(f"Warning: No text extracted from {pdf_path}")
-        return []
+        return [], False
     
     # Extract DIM lines
-    lines = extract_dim_lines(text)
+    lines, red_flag = extract_dim_lines(text)
     if not lines:
         print(f"Warning: No DIM# tags found in {pdf_path}")
-        return []
+        return [], False
     
     # Create dimension list
     dim_list = create_dim_list(lines)
@@ -137,11 +142,11 @@ def process_single_pdf(pdf_path: str) -> List[Dict[str, Any]]:
     # Apply prioritization and filtering
     filtered = prioritize_tags(dim_list)
     
-    return filtered
+    return filtered, red_flag
 
-def process_multiple_pdfs(pdf_paths: List[str]) -> List[Dict[str, Any]]:
+def process_multiple_pdfs(pdf_paths: List[str]) -> Tuple[List[Dict[str, Any]], Dict[str, bool]]:
     """
-    Process multiple PDFs and return combined results.
+    Process multiple PDFs and return combined results with red flags.
     Uses the first PDF to establish the dimension structure,
     then adds values from subsequent PDFs to the same structure.
     
@@ -149,10 +154,13 @@ def process_multiple_pdfs(pdf_paths: List[str]) -> List[Dict[str, Any]]:
         pdf_paths: List of paths to PDF files
         
     Returns:
-        List of dimension entries with combined values from all PDFs
+        Tuple of (List of dimension entries with combined values from all PDFs, 
+                 Dict mapping file names to red flags)
     """
     if not pdf_paths:
-        return []
+        return [], {}
+    
+    red_flags = {}
     
     print(f"Processing first PDF to establish dimension structure: {pdf_paths[0]}")
     
@@ -160,14 +168,15 @@ def process_multiple_pdfs(pdf_paths: List[str]) -> List[Dict[str, Any]]:
     first_pdf_path = pdf_paths[0]
     if not os.path.exists(first_pdf_path):
         print(f"Error: First PDF {first_pdf_path} not found")
-        return []
+        return [], {}
     
     # Get the filtered structure from the first PDF
-    combined_dim_list = process_single_pdf(first_pdf_path)
+    combined_dim_list, first_red_flag = process_single_pdf(first_pdf_path)
+    red_flags[os.path.basename(first_pdf_path)] = first_red_flag
     
     if not combined_dim_list:
         print(f"Warning: No dimensions found in first PDF {first_pdf_path}")
-        return []
+        return [], red_flags
     
     # Process remaining PDFs and add their values to existing structure
     for pdf_path in pdf_paths[1:]:
@@ -175,15 +184,18 @@ def process_multiple_pdfs(pdf_paths: List[str]) -> List[Dict[str, Any]]:
         
         if not os.path.exists(pdf_path):
             print(f"Warning: File {pdf_path} not found, skipping")
+            red_flags[os.path.basename(pdf_path)] = False
             continue
         
         # Extract text and lines from current PDF
-        text = extract_text_from_pdf(pdf_path)
+        text = extract_text_from_pdf(pdf_path) 
+        
         if not text.strip():
             print(f"Warning: No text extracted from {pdf_path}, skipping")
             continue
         
-        lines = extract_dim_lines(text)
+        lines, red_flag = extract_dim_lines(text)
+        red_flags[os.path.basename(pdf_path)] = red_flag
         if not lines:
             print(f"Warning: No DIM# tags found in {pdf_path}, skipping")
             continue
@@ -206,7 +218,7 @@ def process_multiple_pdfs(pdf_paths: List[str]) -> List[Dict[str, Any]]:
                 print(f"Warning: Found new tag '{temp_entry['tag']}' in {pdf_path} not present in first PDF")
                 combined_dim_list.append(temp_entry)
     
-    return combined_dim_list
+    return combined_dim_list, red_flags
 
 def sort_dim_columns(dim_names):
     def extract_dim_number(name):
@@ -223,7 +235,7 @@ def sort_dim_columns(dim_names):
             return 0
     return sorted(dim_names, key=lambda x: (extract_dim_number(x), extract_sub_number(x), x))
 
-def create_wide_format_table(all_measurements):
+def create_wide_format_table(all_measurements, red_flags):
     if not all_measurements:
         return pd.DataFrame()
     parts_data = {}
@@ -247,26 +259,27 @@ def create_wide_format_table(all_measurements):
             col_name = dim.replace('#', '').replace('-', '_').replace('.', '_').rstrip('_')
             row[col_name] = data['measurements'].get(dim)
         row['Unit'] = data['unit']
+        row['Has_OOT_Values'] = red_flags.get(source, False)
         table_data.append(row)
     return pd.DataFrame(table_data)
 
-def get_dataframe(pdf_paths: List[str], file_names) -> List[Dict[str, Any]]:
+def get_dataframe(pdf_paths: List[str]) -> pd.DataFrame:
     """
-    Main function to process PDFs and optionally save results.
+    Main function to process PDFs and return dataframe with red value detection.
     
     Args:
         pdf_paths: List of PDF file paths to process
-        output_file: Optional path to save JSON output
+        file_names: File names parameter (maintained for compatibility)
         
     Returns:
-        List containing combined dimension data from all PDFs
+        DataFrame containing combined dimension data from all PDFs with red value flags
     """
     start = time.time()
     print("Starting processing...")
     print(f"Processing {len(pdf_paths)} PDF(s)...")
     
-    # Process all PDFs with combined structure
-    results = process_multiple_pdfs(pdf_paths)
+    # Process all PDFs with combined structure and get red flags
+    results, red_flags = process_multiple_pdfs(pdf_paths)
     
     measurements = []
     for entry in results:
@@ -280,13 +293,13 @@ def get_dataframe(pdf_paths: List[str], file_names) -> List[Dict[str, Any]]:
                     'Plus_Tolerance': None,
                     'Minus_Tolerance': None,
                     'Deviation': None,
-                    'Source_File': file_names[file_index],
-                    'Part_Number': ''
+                    'Source_File': os.path.basename(pdf_paths[file_index]),
+                    'Part_Number': '',
                 })
             except ValueError:
                 continue
     
-    df = create_wide_format_table(measurements)
+    df = create_wide_format_table(measurements, red_flags)
     
     print("Processing complete!")
     end = time.time()
