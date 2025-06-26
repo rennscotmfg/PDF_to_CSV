@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_file, render_template
 import os
-from parser import extract_calypso_data, create_wide_format_table
+from parser import get_dataframe
 from csv_exporter import generate_transposed_csv
 from json_exporter import export_json
 from io import BytesIO
@@ -26,7 +26,8 @@ def upload_files():
             return jsonify({'success': False, 'error': 'No files provided'})
 
         all_measurements = []
-        processed_files = []
+        file_paths = []
+        file_names = []
         errors = []
 
         for file in files:
@@ -38,38 +39,32 @@ def upload_files():
 
             try:
                 temp_path = os.path.join(UPLOAD_FOLDER, file.filename)
+                file_paths.append(temp_path)
+                file_names.append(file.filename)
                 file.save(temp_path)
-
-                measurements = extract_calypso_data(temp_path)
-                if measurements:
-                    for m in measurements:
-                        m['Source_File'] = file.filename
-                        m['Part_Number'] = 'Unknown'
-                    all_measurements.extend(measurements)
-                    processed_files.append(file.filename)
-                    total_measurements = len(measurements)
-                else:
-                    errors.append(f"{file.filename}: No measurement data found")
-
-                os.remove(temp_path)
             except Exception as e:
                 errors.append(f"{file.filename}: {str(e)}")
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+        
+        try:
+            df = get_dataframe(file_paths, file_names)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Error processing files: {str(e)}'})
+        
+        for file in file_paths:
+            try:
+                os.remove(file)
+            except Exception as e:
+                print(f"Warning: Could not delete temp file {file}: {str(e)}")
 
-        if not all_measurements:
-            return jsonify({'success': False, 'error': 'No measurement data extracted from any files', 'details': errors})
-
-        df = create_wide_format_table(all_measurements)
         app.config['CURRENT_DATA'] = df
         app.config['JSON_DATA'] = export_json(df)
         preview_data = df.head(10).to_dict('records') if not df.empty else []
 
         return jsonify({
             'success': True,
-            'total_measurements': total_measurements,
+            'total_measurements': sum('DIM' in col for col in df.columns),
             'total_parts': len(df) if not df.empty else 0,
-            'processed_files': processed_files,
+            'processed_files': file_names,
             'errors': errors if errors else None,
             'columns': df.columns.tolist() if not df.empty else [],
             'preview': preview_data
